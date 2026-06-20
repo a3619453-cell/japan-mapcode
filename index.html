@@ -47,44 +47,73 @@ body{
     radial-gradient(120% 100% at 92% 100%, rgba(120,95,45,.16), transparent 52%),
     linear-gradient(180deg, rgba(18,16,11,.55), rgba(18,16,11,.30) 40%, rgba(18,16,11,.66));
 }
-/* ====== Liquid glass primitives ====== */
+/* ====== Liquid Glass primitives ======
+   Authentic iOS 26 model: clear-ish center, refined hairline edge with a soft
+   specular rim, motion-reactive highlight. Refraction (SVG lensing) is layered
+   on ONLY for browsers that support url() in backdrop-filter (Chromium);
+   Safari/Firefox gracefully fall back to blur + the same rim/highlights. */
 .glass{
   position:relative;
-  background:linear-gradient(155deg,
-     rgba(var(--glass-rgb),calc(var(--glass-a) + .10)),
-     rgba(var(--glass-rgb),var(--glass-a)) 58%,
-     rgba(var(--glass-rgb),calc(var(--glass-a) - .04)));
-  -webkit-backdrop-filter:blur(var(--blur)) saturate(150%);
-  backdrop-filter:blur(var(--blur)) saturate(150%);
-  border:1px solid rgba(255,255,255,.10);
   border-radius:var(--radius);
+  background:
+    linear-gradient(155deg,
+      rgba(var(--glass-rgb),calc(var(--glass-a) - .06)),
+      rgba(var(--glass-rgb),calc(var(--glass-a) - .16)) 60%,
+      rgba(var(--glass-rgb),calc(var(--glass-a) - .10)));
+  /* base: blur only — universally supported, the reliable fallback */
+  -webkit-backdrop-filter:blur(14px) saturate(170%) brightness(1.05);
+  backdrop-filter:blur(14px) saturate(170%) brightness(1.05);
+  /* refined edge: fine outer drop + soft, thin inner highlights (no thick white line) */
   box-shadow:
-    0 18px 50px -18px rgba(0,0,0,.7),
-    inset 0 1px 0 rgba(255,255,255,.22),
-    inset 0 0 0 1px rgba(255,255,255,.03),
-    inset 0 -16px 30px -22px rgba(0,0,0,.6);
+    0 12px 34px -18px rgba(0,0,0,.55),
+    0 1px 3px -1px rgba(0,0,0,.3),
+    inset 0 .5px 0 rgba(255,255,255,.32),
+    inset 0 0 0 .5px rgba(255,255,255,.05),
+    inset 0 -14px 24px -26px rgba(0,0,0,.4);
+  border:.5px solid rgba(255,255,255,.12);
   overflow:hidden;
+  isolation:isolate;
 }
-/* top edge specular highlight */
+/* Chromium only: add SVG lensing on top of the blur for true edge refraction */
+html.lens-ok .glass{
+  -webkit-backdrop-filter:blur(2px) saturate(180%) brightness(1.06) url(#liquid-lens);
+  backdrop-filter:blur(2px) saturate(180%) brightness(1.06) url(#liquid-lens);
+}
+/* specular rim — a fine, soft bevel hugging the edge, brightest toward the light.
+   Thin (0.6px) and low-contrast so it reads as a glass edge, not a drawn outline. */
 .glass::before{
-  content:"";position:absolute;left:0;right:0;top:0;height:46%;
-  background:linear-gradient(180deg, rgba(255,255,255,.20), rgba(255,255,255,0));
-  opacity:.7;pointer-events:none;mix-blend-mode:screen;
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  padding:.6px;
+  background:linear-gradient(
+    var(--spec-angle,135deg),
+    rgba(255,255,255,.55),
+    rgba(255,255,255,.06) 20%,
+    rgba(255,255,255,0) 42%,
+    rgba(255,255,255,0) 62%,
+    rgba(255,255,255,.05) 84%,
+    rgba(255,255,255,.32));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  mix-blend-mode:screen;opacity:.8;
 }
-/* moving sheen */
+/* travelling glint that follows tilt or pointer */
 .glass::after{
-  content:"";position:absolute;top:-60%;left:-30%;width:60%;height:220%;
-  background:linear-gradient(105deg, transparent, rgba(255,255,255,.14), transparent);
-  transform:rotate(8deg);pointer-events:none;opacity:0;
-  transition:opacity .5s;
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(55% 45% at var(--glint-x,30%) var(--glint-y,18%),
+    rgba(255,255,255,.16), rgba(255,255,255,0) 70%);
+  mix-blend-mode:screen;opacity:.7;transition:background-position .1s linear;
 }
-.glass:hover::after{opacity:.5;animation:sheen 1.6s ease}
-@keyframes sheen{from{left:-40%}to{left:120%}}
 
-/* refraction layer (optional, toggled) */
-body.refract .refract-target{
-  -webkit-backdrop-filter:blur(var(--blur)) saturate(155%) url(#glass-refract);
-  backdrop-filter:blur(var(--blur)) saturate(155%) url(#glass-refract);
+/* refraction strength toggle: "soft" removes lensing for readability (all browsers) */
+body.soft-glass .glass,
+html.lens-ok body.soft-glass .glass{
+  -webkit-backdrop-filter:blur(12px) saturate(150%) brightness(1.03);
+  backdrop-filter:blur(12px) saturate(150%) brightness(1.03);
+}
+
+/* Browsers with no backdrop-filter at all: lift tint so panels stay readable */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .glass{background:rgba(var(--glass-rgb),.92)}
 }
 
 /* ====== Layout ====== */
@@ -92,6 +121,15 @@ body.refract .refract-target{
 .topbar{
   display:flex;align-items:center;gap:14px;
   padding:14px clamp(14px,3vw,30px);
+}
+/* text-heavy panels get a slightly stronger tint floor for legibility,
+   while small floating controls stay maximally glassy */
+.panel,.result-card{
+  background:
+    linear-gradient(155deg,
+      rgba(var(--glass-rgb),calc(var(--glass-a) + .06)),
+      rgba(var(--glass-rgb),calc(var(--glass-a) - .04)) 60%,
+      rgba(var(--glass-rgb),var(--glass-a)));
 }
 .brand{display:flex;flex-direction:column;line-height:1.05}
 .brand .eyebrow{
@@ -282,12 +320,40 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
 </head>
 <body>
 
-<!-- SVG refraction filter -->
+<script>
+/* Detect browsers where SVG url() filters actually work inside backdrop-filter.
+   Per spec this isn't guaranteed; in practice only Chromium (Blink) renders it,
+   while Safari/Firefox ignore the url() and would show no refraction. We enable
+   the lensing layer for Chromium-but-not-Safari and let everything else fall
+   back to a clean blur. Set on <html> before paint to avoid a flash. */
+(function(){
+  try{
+    var ua=navigator.userAgent;
+    var isSafari=/^((?!chrome|android|crios|fxios).)*safari/i.test(ua);
+    var isFirefox=/firefox|fxios/i.test(ua);
+    var blinkLike=(window.chrome!=null)||/chrome|chromium|crios|edg\//i.test(ua);
+    var supports=(window.CSS&&CSS.supports&&
+      (CSS.supports('backdrop-filter','url(#x)')||CSS.supports('-webkit-backdrop-filter','url(#x)')));
+    if(supports && blinkLike && !isSafari && !isFirefox){
+      document.documentElement.classList.add('lens-ok');
+    }
+  }catch(e){}
+})();
+</script>
+
+<!-- Liquid Glass lensing filter: displacement concentrated at the edges
+     so the background magnifies/bends at the rim, staying clear in the center -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <filter id="glass-refract" x="-20%" y="-20%" width="140%" height="140%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.012 0.016" numOctaves="2" seed="7" result="noise"/>
-    <feGaussianBlur in="noise" stdDeviation="1.1" result="sn"/>
-    <feDisplacementMap in="SourceGraphic" in2="sn" scale="14" xChannelSelector="R" yChannelSelector="G"/>
+  <filter id="liquid-lens" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
+    <!-- a smooth, low-frequency field gives a gentle continuous bend (not ripply noise) -->
+    <feTurbulence type="fractalNoise" baseFrequency="0.006 0.009" numOctaves="2" seed="12" result="field"/>
+    <feGaussianBlur in="field" stdDeviation="3.2" result="smoothField"/>
+    <!-- radial gradient: black(no shift) center -> bright(max shift) edges -->
+    <feImage xlink:href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3CradialGradient id='g' cx='50%25' cy='50%25' r='50%25'%3E%3Cstop offset='58%25' stop-color='%23808080'/%3E%3Cstop offset='100%25' stop-color='%23ffffff'/%3E%3C/radialGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E"
+      x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="edgeMask"/>
+    <!-- multiply field by edge mask so displacement ~0 in middle, strong at rim -->
+    <feComposite in="smoothField" in2="edgeMask" operator="arithmetic" k1="1.1" k2="0" k3="0" k4="0" result="edgeField"/>
+    <feDisplacementMap in="SourceGraphic" in2="edgeField" scale="28" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
 </svg>
 
@@ -308,18 +374,18 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
 
   <!-- settings popover -->
   <div class="settings-pop glass refract-target" id="settings-pop">
-    <h4>顯示設定</h4>
+    <h4>玻璃外觀</h4>
     <div class="set-row">
-      <div><div class="lbl">玻璃折射效果</div><div class="set-note">進階：背景透過玻璃會產生光線扭曲</div></div>
-      <div class="toggle" id="tg-refract" role="switch" tabindex="0"><div class="dot"></div></div>
+      <div><div class="lbl">清晰可讀模式</div><div class="set-note">關閉邊緣折射、加重模糊，文字更好讀</div></div>
+      <div class="toggle" id="tg-soft" role="switch" tabindex="0"><div class="dot"></div></div>
     </div>
     <div class="set-row">
-      <div class="lbl">玻璃模糊強度</div>
-      <input type="range" id="rg-blur" min="6" max="36" value="22">
+      <div class="lbl">折射強度</div>
+      <input type="range" id="rg-lens" min="0" max="60" value="28">
     </div>
     <div class="set-row">
       <div class="lbl">面板透明度</div>
-      <input type="range" id="rg-alpha" min="20" max="80" value="46">
+      <input type="range" id="rg-alpha" min="20" max="70" value="46">
     </div>
   </div>
 
@@ -668,14 +734,60 @@ const sb=$('#settings-btn'), sp=$('#settings-pop');
 sb.onclick=()=>sp.classList.toggle('open');
 document.addEventListener('click',e=>{ if(!sp.contains(e.target)&&!sb.contains(e.target)) sp.classList.remove('open'); });
 
-const tgRefract=$('#tg-refract');
-function setRefract(on){document.body.classList.toggle('refract',on);tgRefract.classList.toggle('on',on);
-  localStorage.setItem('jmc-refract',on?'1':'0');}
-tgRefract.onclick=()=>setRefract(!document.body.classList.contains('refract'));
-setRefract(localStorage.getItem('jmc-refract')==='1');
+/* clarity (soft) toggle */
+const tgSoft=$('#tg-soft');
+function setSoft(on){document.body.classList.toggle('soft-glass',on);tgSoft.classList.toggle('on',on);
+  localStorage.setItem('jmc-soft',on?'1':'0');}
+tgSoft.onclick=()=>setSoft(!document.body.classList.contains('soft-glass'));
+setSoft(localStorage.getItem('jmc-soft')==='1');
 
-$('#rg-blur').oninput=e=>document.documentElement.style.setProperty('--blur',e.target.value+'px');
+/* lens strength -> SVG displacement scale */
+const dispNode=document.querySelector('#liquid-lens feDisplacementMap');
+function setLens(v){ if(dispNode) dispNode.setAttribute('scale', v); localStorage.setItem('jmc-lens',v); }
+const savedLens=localStorage.getItem('jmc-lens')||'28';
+$('#rg-lens').value=savedLens; setLens(savedLens);
+$('#rg-lens').oninput=e=>setLens(e.target.value);
+
 $('#rg-alpha').oninput=e=>document.documentElement.style.setProperty('--glass-a',(e.target.value/100).toFixed(2));
+
+/* ===================== Motion-reactive specular highlights =====================
+   On a phone, tilt drives the glint + specular rim angle (gyroscope).
+   On desktop, pointer movement does. This is the "alive" part of Liquid Glass. */
+let glintRAF=null;
+function applyTilt(gx,gy){ // gx,gy in -1..1
+  if(glintRAF) return;
+  glintRAF=requestAnimationFrame(()=>{
+    glintRAF=null;
+    const root=document.documentElement.style;
+    root.setProperty('--glint-x',(30+gx*40)+'%');
+    root.setProperty('--glint-y',(18+gy*30)+'%');
+    root.setProperty('--spec-angle',(135+gx*60)+'deg');
+  });
+}
+// pointer (desktop / fallback)
+window.addEventListener('pointermove',e=>{
+  const gx=(e.clientX/innerWidth)*2-1, gy=(e.clientY/innerHeight)*2-1;
+  applyTilt(gx,gy);
+},{passive:true});
+
+// device tilt (mobile). iOS needs a permission gesture, so request on first tap.
+let motionReady=false;
+function startMotion(){
+  if(motionReady) return; motionReady=true;
+  window.addEventListener('deviceorientation',e=>{
+    if(e.gamma==null) return;
+    const gx=Math.max(-1,Math.min(1,e.gamma/45)); // left-right tilt
+    const gy=Math.max(-1,Math.min(1,(e.beta-45)/45)); // front-back
+    applyTilt(gx,gy);
+  });
+}
+function maybeRequestMotion(){
+  if(typeof DeviceOrientationEvent!=='undefined' &&
+     typeof DeviceOrientationEvent.requestPermission==='function'){
+    DeviceOrientationEvent.requestPermission().then(s=>{ if(s==='granted') startMotion(); }).catch(()=>{});
+  } else startMotion();
+}
+window.addEventListener('touchstart',maybeRequestMotion,{once:true,passive:true});
 
 /* keep Leaflet sized correctly across layout / orientation changes */
 function fixMapSize(){ map.invalidateSize(); bg.invalidateSize(); }
