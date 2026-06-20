@@ -191,8 +191,10 @@ main{
 .panel{padding:20px}
 .left{
   display:flex;flex-direction:column;gap:16px;min-height:0;
-  width:380px;max-width:calc(100vw - 28px);
-  max-height:100%;overflow:auto;padding-right:4px;
+  width:408px;max-width:calc(100vw - 28px);
+  max-height:100%;overflow:auto;
+  /* inner padding gives the card drop-shadows room so the scroll box never clips them */
+  padding:8px 16px 28px;
 }
 .left::-webkit-scrollbar{width:0}
 
@@ -357,8 +359,8 @@ body.light .code-big{color:#1c2530;text-shadow:none}
      so the lower part of the screen stays open map — and the located marker is
      focused into that open lower area (see visibleCenter), never behind the panel. */
   .left{
-    width:100%;max-width:100%;padding-right:0;
-    max-height:56vh;                 /* cap the panel so the lower screen stays open map */
+    width:100%;max-width:100%;
+    max-height:58vh;                 /* cap the panel so the lower screen stays open map (padding from base) */
   }
   .settings-pop{left:14px;right:14px;width:auto;top:60px;position:fixed}
   .recenter{bottom:calc(18px + env(safe-area-inset-bottom))}
