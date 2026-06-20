@@ -352,28 +352,17 @@ body.light .code-big{color:#1c2530;text-shadow:none}
 
 /* ====== Responsive ====== */
 @media (max-width:880px){
-  /* One continuous scrolling page: the map is no longer a fixed bottom block but
-     an inline card that sits in the flow below the search / result. The user
-     searches at the top and simply scrolls down to confirm on the map. */
-  html,body{height:auto;min-height:100%}
-  body{overflow:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
-  #bg-veil{display:none}                 /* no full-screen map behind the panels */
-  #app{position:static;height:auto;display:block;pointer-events:auto}
-  main{flex:none;display:block;min-height:0;overflow:visible;
-    padding:0 clamp(14px,3vw,30px) 16px}
-  .left{width:100%;max-width:100%;overflow:visible;max-height:none;padding-right:0}
-  .site-footer{pointer-events:auto}
-  /* map as an inline card within the scroll flow (between result and history) */
-  body.map-inline #map{
-    position:relative;inset:auto;z-index:0;
-    width:100%;height:68vh;min-height:340px;margin:2px 0;
-    border-radius:var(--radius);overflow:hidden;
-    border:.5px solid rgba(255,255,255,.12);
-    box-shadow:0 12px 34px -18px rgba(0,0,0,.55);
+  /* Mobile keeps the immersive full-screen ("full board") map, same as desktop.
+     The glass panel floats at the TOP with a capped height and scrolls internally,
+     so the lower part of the screen stays open map — and the located marker is
+     focused into that open lower area (see visibleCenter), never behind the panel. */
+  .left{
+    width:100%;max-width:100%;padding-right:0;
+    max-height:56vh;                 /* cap the panel so the lower screen stays open map */
   }
   .settings-pop{left:14px;right:14px;width:auto;top:60px;position:fixed}
-  /* the floating map overlays aren't needed when the map is in-flow */
-  .recenter,.maptip{display:none}
+  .recenter{bottom:calc(18px + env(safe-area-inset-bottom))}
+  .maptip{bottom:calc(18px + env(safe-area-inset-bottom))}
 }
 @media (max-width:480px){
   .brand h1 .jp{display:none}
@@ -654,20 +643,25 @@ const mcIcon=L.divIcon({className:'mc-marker',
   iconSize:[34,44],iconAnchor:[17,44]});
 let marker=null, lastLatLng=null;
 
-/* Compute the map center so the marker lands in the visible area.
-   Desktop: the map is full-screen with a floating left panel, so offset the
-   marker to the right of that panel. Mobile: the map is its own block at the
-   bottom (no overlay), so just center the marker in it. */
+/* Compute the map center so the marker lands in a visible, unobstructed spot.
+   Desktop: the panel floats on the left, so offset the marker to its right.
+   Mobile: the panel floats at the top of the full-screen map, so drop the marker
+   into the open lower area beneath it (centre of the band below the panel). */
 function visibleCenter(lat,lng,zoom){
   const size=map.getSize();
   const isMobile=window.matchMedia('(max-width:880px)').matches;
   const z=zoom!=null?zoom:map.getZoom();
+  let targetX,targetY;
   if(isMobile){
-    return L.latLng(lat,lng);   // map block is unobstructed; center normally
+    const panel=document.querySelector('.left');
+    const pb=panel?Math.min(panel.getBoundingClientRect().bottom,size.y*0.6):size.y*0.55;
+    targetX=size.x*0.5;
+    targetY=(pb+size.y*0.9)/2;   // midway between the panel's bottom and the lower edge
+  }else{
+    const panelRight=Math.min(430, size.x*0.5);
+    targetX=panelRight+(size.x-panelRight)*0.5;
+    targetY=size.y*0.5;
   }
-  const panelRight=Math.min(430, size.x*0.5);
-  const targetX=panelRight+(size.x-panelRight)*0.5;
-  const targetY=size.y*0.5;
   const targetPt=map.project([lat,lng],z);
   const centerPt=targetPt.subtract(
     L.point(targetX,targetY).subtract(L.point(size.x/2,size.y/2))
@@ -731,16 +725,16 @@ function showResult(lat,lng,placeName){
   revealResult();
 }
 
-/* One scrolling page on mobile: after a lookup, bring the result card to the top
-   so the code shows with the inline map directly beneath it for confirmation.
-   Suppressed for the initial demo so the page still opens at the search box. */
+/* On mobile the panel floats over the full-screen map and scrolls internally.
+   After a lookup, surface the result card within that panel; the marker itself is
+   auto-focused into the open lower area by visibleCenter. */
 let revealEnabled=false;
 function revealResult(){
   if(!revealEnabled) return;
   if(!window.matchMedia('(max-width:880px)').matches) return;
   requestAnimationFrame(()=>{
     const card=document.getElementById('result-card');
-    if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
+    if(card) card.scrollIntoView({behavior:'smooth',block:'nearest'});
   });
 }
 
@@ -999,29 +993,7 @@ window.addEventListener('orientationchange', ()=>setTimeout(fixMapSize,250));
   },{passive:false});
 })();
 
-/* ===================== Mobile: inline map in a single scroll flow =====================
-   Desktop keeps the full-screen background map with the floating panel. On mobile
-   the same #map element is relocated into the panel flow (between the result card
-   and the history) so the whole page is one scroll: search on top, map below. */
-const mq880=window.matchMedia('(max-width:880px)');
-const mapEl=document.getElementById('map');
-const veilEl=document.getElementById('bg-veil');
-const leftSection=document.querySelector('.left');
-const histPanel=document.querySelector('.hist');
-function placeMap(){
-  if(mq880.matches){
-    if(mapEl.parentElement!==leftSection) leftSection.insertBefore(mapEl,histPanel);
-    document.body.classList.add('map-inline');
-  }else{
-    if(mapEl.parentElement!==document.body) document.body.insertBefore(mapEl,veilEl);
-    document.body.classList.remove('map-inline');
-  }
-  setTimeout(()=>map.invalidateSize(),60);
-}
-mq880.addEventListener('change',placeMap);
-placeMap();
-
-/* init demo marker (does not auto-scroll; the page opens at the search box) */
+/* init demo marker (marker is focused into the open lower area on mobile) */
 setTimeout(()=>{ showResult(35.6586,139.7454,'東京タワー（範例）'); fixMapSize(); revealEnabled=true; },300);
 setTimeout(fixMapSize, 800);
 </script>
