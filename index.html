@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>日本 Mapcode 查詢工具</title>
+<title>日本地點代碼查詢</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -302,6 +302,15 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
 .leaflet-control-attribution a{color:#c0b8a8!important}
 .mc-marker{filter:drop-shadow(0 0 10px rgba(245,166,35,.8))}
 
+/* ====== Footer / disclaimer ====== */
+.site-footer{
+  padding:14px clamp(14px,3vw,30px) calc(16px + env(safe-area-inset-bottom));
+  color:var(--ink-faint);font-size:11px;line-height:1.6;
+  max-width:1100px;
+}
+.site-footer p{margin:0 0 4px}
+.site-footer p:last-child{margin:0;opacity:.85}
+
 /* ====== Responsive ====== */
 @media (max-width:880px){
   html,body{height:auto;overflow:visible}
@@ -371,8 +380,8 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
 <div id="app">
   <header class="topbar">
     <div class="brand">
-      <span class="eyebrow">Japan Mapcode</span>
-      <h1>日本地圖碼查詢<span class="jp">マップコード</span></h1>
+      <span class="eyebrow">Japan Location Code</span>
+      <h1>日本地點代碼查詢<span class="jp">座標 → 代碼</span></h1>
     </div>
     <div class="spacer"></div>
     <div class="icon-btn glass refract-target" id="settings-btn" title="設定" role="button" tabindex="0">
@@ -431,13 +440,13 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
             <label class="fld">緯度 Lat<input type="number" id="in-lat" step="any" placeholder="35.6586"></label>
             <label class="fld">經度 Lng<input type="number" id="in-lng" step="any" placeholder="139.7454"></label>
           </div>
-          <button class="btn full" id="btn-latlng">計算地圖碼</button>
+          <button class="btn full" id="btn-latlng">計算代碼</button>
           <div class="hint">直接輸入座標。也可貼上「35.6586, 139.7454」於緯度欄，會自動拆分。</div>
         </div>
 
         <!-- pick on map -->
         <div class="pane" data-pane="pick">
-          <p class="hint" style="margin:0">在右側地圖上任一點按下，即會算出該位置的地圖碼。手機點下方地圖即可。</p>
+          <p class="hint" style="margin:0">在右側地圖上任一點按下，即會算出該位置的代碼。手機點下方地圖即可。</p>
           <button class="btn ghost full" id="btn-pickmode">啟用點選模式</button>
           <div class="hint" id="pick-status" style="color:var(--amber-soft)"></div>
         </div>
@@ -445,10 +454,10 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
         <!-- reverse -->
         <div class="pane" data-pane="rev">
           <div class="input-wrap">
-            <input type="text" id="q-rev" placeholder="輸入地圖碼，例：6 554 564*85">
+            <input type="text" id="q-rev" placeholder="輸入代碼，例：6 554 564*85">
             <button class="btn" id="btn-rev">定位</button>
           </div>
-          <div class="hint">支援格式：<code>zone block unit*core</code>，如 <code>6 554 564*85</code> 或 zone 0 的 <code>564*85</code>。反查為網格中心點的近似位置。</div>
+          <div class="hint">採 mapcode 相容格式 <code>zone block unit*core</code>，如 <code>6 554 564*85</code> 或 zone 0 的 <code>564*85</code>。反查為網格中心點的近似位置。</div>
         </div>
       </div>
 
@@ -484,12 +493,16 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
       </div>
     </section>
   </main>
+  <footer class="site-footer">
+    <p>本工具與 DENSO 公司無任何關聯。「マップコード（MAPCODE）」為株式会社 DENSO 之註冊商標，本站僅產生相容格式之地點代碼，供參考用途，計算結果可能與官方數值有誤差，請勿作為唯一依據。</p>
+    <p>地圖與地名資料 © OpenStreetMap 貢獻者（ODbL）· 圖磚 © CARTO · 地名搜尋由 Nominatim 提供。</p>
+  </footer>
 </div>
 
 <script src="zonecoords.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-/* ===================== Mapcode core (reverse-engineered grid) ===================== */
+/* ===================== Location-code core (grid algorithm, mapcode-compatible) ===================== */
 const Zone = {
   pad:(v,n)=>('0000000000'+v).slice(-n),
   inZone(lat,lng){
@@ -611,12 +624,12 @@ function showResult(lat,lng,placeName){
   const st=$('#status');
   if(code==='NOT_IN_JAPAN'){
     $('#r-code').textContent='—';
-    st.textContent='此座標不在日本地圖碼涵蓋範圍內。'; st.className='status err';
+    st.textContent='此座標不在代碼涵蓋範圍內。'; st.className='status err';
     return;
   }
   if(code===null){ st.textContent='資料載入中…'; st.className='status'; return; }
   $('#r-code').textContent=code;
-  st.textContent='已算出地圖碼'; st.className='status ok';
+  st.textContent='已算出代碼'; st.className='status ok';
   setMarker(lat,lng);
   addHistory(placeName||('('+lat.toFixed(4)+', '+lng.toFixed(4)+')'),code,lat,lng);
 }
@@ -647,8 +660,8 @@ $('#btn-rev').onclick=()=>{
   const r=Zone.decode($('#q-rev').value);
   $('#result-card').style.display='block';
   const st=$('#status');
-  if(!r){ st.textContent='地圖碼格式無法解析，請參考範例格式。'; st.className='status err'; return; }
-  $('#r-place').textContent='地圖碼反查（網格中心近似）';
+  if(!r){ st.textContent='代碼格式無法解析，請參考範例格式。'; st.className='status err'; return; }
+  $('#r-place').textContent='代碼反查（網格中心近似）';
   $('#r-lat').textContent=r.lat.toFixed(6);
   $('#r-lng').textContent=r.lng.toFixed(6);
   $('#r-code').textContent=$('#q-rev').value.trim();
@@ -684,7 +697,7 @@ function doSearch(){
     box.innerHTML='';
     const div=document.createElement('div'); div.className='res';
     div.innerHTML='<div><div class="nm">在 Google 地圖搜尋「'+esc(q)+'」</div>'+
-      '<div class="ad">開啟後請複製座標，貼到「經緯度」分頁即可算地圖碼</div></div>'+
+      '<div class="ad">開啟後請複製座標，貼到「經緯度」分頁即可計算代碼</div></div>'+
       '<span class="gmap">開啟 ↗</span>';
     div.onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q),'_blank');
     box.appendChild(div);
