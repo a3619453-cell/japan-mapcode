@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{
+  /* dark theme (default) */
   --bg-0:#15140f;
   --bg-1:#1f1d16;
   --ink:#f3efe6;
@@ -20,11 +21,34 @@
   --line:rgba(212,200,176,.16);
   --glass-rgb:40,37,30;
   --glass-a:.46;
+  --field:rgba(255,255,255,.06);
+  --field-line:rgba(212,200,176,.16);
+  --veil:linear-gradient(180deg, rgba(18,16,11,.42), rgba(18,16,11,.14) 38%, rgba(18,16,11,.5));
+  --rim:rgba(255,255,255,.55);
+  --rim-soft:rgba(255,255,255,.05);
   --blur:22px;
   --radius:22px;
   --ring:rgba(245,166,35,.55);
   --good:#52d6a0;
   --bad:#ff6b6b;
+}
+body.light{
+  --bg-0:#e9eef2;
+  --bg-1:#f4f7fa;
+  --ink:#1c2530;
+  --ink-dim:#4a5868;
+  --ink-faint:#8493a4;
+  --amber:#d4820a;
+  --amber-soft:#a8650a;
+  --line:rgba(40,60,85,.14);
+  --glass-rgb:255,255,255;
+  --glass-a:.5;
+  --field:rgba(40,60,85,.06);
+  --field-line:rgba(40,60,85,.14);
+  --veil:linear-gradient(180deg, rgba(225,232,238,.30), rgba(225,232,238,.05) 40%, rgba(210,220,228,.34));
+  --rim:rgba(255,255,255,.9);
+  --rim-soft:rgba(255,255,255,.5);
+  --ring:rgba(212,130,10,.5);
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -35,17 +59,14 @@ body{
   background:var(--bg-0);
   overflow:hidden;
 }
-/* ====== Background live map ====== */
-#bgmap{
+/* ====== Full-screen interactive map (background) ====== */
+#map{
   position:fixed;inset:0;z-index:0;
-  filter:saturate(.72) brightness(.66) contrast(1.04);
 }
 #bg-veil{
   position:fixed;inset:0;z-index:1;pointer-events:none;
-  background:
-    radial-gradient(120% 90% at 18% 8%, rgba(245,166,35,.10), transparent 46%),
-    radial-gradient(120% 100% at 92% 100%, rgba(120,95,45,.16), transparent 52%),
-    linear-gradient(180deg, rgba(18,16,11,.55), rgba(18,16,11,.30) 40%, rgba(18,16,11,.66));
+  background:var(--veil);
+  transition:background .4s;
 }
 /* ====== Liquid Glass primitives ======
    Authentic iOS 26 model: clear-ish center, refined hairline edge with a soft
@@ -125,7 +146,12 @@ html.lens-ok body.soft-glass .glass{
 }
 
 /* ====== Layout ====== */
-#app{position:relative;z-index:2;height:100%;display:flex;flex-direction:column}
+/* The app is an overlay above the map. It must let pointer events fall through
+   to the map, except on the panels/controls themselves. */
+#app{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;
+  pointer-events:none}
+#app .glass,#app button,#app input,#app a,#app .res,#app .hi,
+#app .tabs,#app .seg,#app .toggle,#app .site-footer,#app .results{pointer-events:auto}
 .topbar{
   display:flex;align-items:center;gap:14px;
   padding:14px clamp(14px,3vw,30px);
@@ -158,18 +184,21 @@ html.lens-ok body.soft-glass .glass{
 
 main{
   flex:1;min-height:0;
-  display:grid;grid-template-columns:380px 1fr;gap:18px;
+  display:block;
   padding:0 clamp(14px,3vw,30px) clamp(14px,3vw,26px);
+  overflow:hidden;
 }
 .panel{padding:20px}
-.left{display:flex;flex-direction:column;gap:16px;min-height:0;overflow:auto;padding-right:4px}
+.left{
+  display:flex;flex-direction:column;gap:16px;min-height:0;
+  width:380px;max-width:calc(100vw - 28px);
+  max-height:100%;overflow:auto;padding-right:4px;
+}
 .left::-webkit-scrollbar{width:0}
-.right{position:relative;min-height:0}
-#map{position:absolute;inset:0;border-radius:var(--radius);overflow:hidden}
 
 /* ====== Input tabs ====== */
 .tabs{display:flex;gap:6px;padding:5px;border-radius:15px;
-  background:rgba(255,255,255,.05);border:1px solid var(--line)}
+  background:var(--field);border:1px solid var(--line)}
 .tab{
   flex:1;padding:9px 4px;border-radius:11px;border:0;background:transparent;
   color:var(--ink-dim);font-family:'Noto Sans TC';font-size:12.5px;font-weight:500;
@@ -185,13 +214,13 @@ label.fld{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--
 .input-wrap{position:relative;display:flex;gap:8px}
 input[type=text],input[type=number]{
   width:100%;padding:13px 14px;border-radius:14px;
-  background:rgba(255,255,255,.06);border:1px solid var(--line);
+  background:var(--field);border:1px solid var(--field-line);
   color:var(--ink);font-size:15px;font-family:'Noto Sans TC';outline:none;
   transition:.18s;
 }
 input::placeholder{color:var(--ink-faint)}
 input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
-  background:rgba(255,255,255,.09)}
+  background:var(--field)}
 .latlng-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .btn{
   border:0;cursor:pointer;border-radius:14px;font-family:'Noto Sans TC';
@@ -202,23 +231,24 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
 }
 .btn:hover{transform:translateY(-1px);filter:brightness(1.05)}
 .btn:active{transform:translateY(0)}
-.btn.ghost{background:rgba(255,255,255,.07);color:var(--ink);
+.btn.ghost{background:var(--field);color:var(--ink);
   box-shadow:inset 0 0 0 1px var(--line);font-weight:500}
 .btn.full{width:100%}
 .hint{font-size:11.5px;color:var(--ink-faint);line-height:1.5}
 
 /* source switch */
 .src-switch{display:flex;gap:6px;align-items:center;font-size:11.5px;color:var(--ink-faint)}
-.seg{display:flex;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
-.seg button{padding:6px 11px;border:0;background:transparent;color:var(--ink-dim);
-  font-size:11.5px;cursor:pointer;font-family:'Noto Sans TC'}
+.seg{display:flex;border-radius:10px;overflow:hidden;border:1px solid var(--line);flex:none}
+.seg button{padding:6px 10px;border:0;background:transparent;color:var(--ink-dim);
+  font-size:11.5px;cursor:pointer;font-family:'Noto Sans TC';white-space:nowrap}
 .seg button.on{background:rgba(245,166,35,.18);color:var(--amber-soft)}
+.set-divider{height:1px;background:var(--line);margin:14px 0 2px}
 
 /* search results */
 .results{display:flex;flex-direction:column;gap:7px;margin-top:2px}
 .res{
   display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:13px;
-  background:rgba(255,255,255,.045);border:1px solid var(--line);cursor:pointer;
+  background:var(--field);border:1px solid var(--line);cursor:pointer;
   transition:.15s;
 }
 .res:hover{background:rgba(245,166,35,.10);border-color:rgba(245,166,35,.3)}
@@ -237,10 +267,11 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
   font-size:clamp(26px,4.6vw,38px);letter-spacing:.01em;color:#fff;
   text-shadow:0 0 26px rgba(245,166,35,.4);word-break:break-all;line-height:1.15;
 }
+body.light .code-big{color:#1c2530;text-shadow:none}
 .code-row{display:flex;align-items:center;gap:12px;margin-top:4px}
 .copy-btn{
   margin-inline-start:auto;width:40px;height:40px;border-radius:12px;border:0;cursor:pointer;
-  background:rgba(255,255,255,.08);color:var(--ink);display:grid;place-items:center;
+  background:var(--field);color:var(--ink);display:grid;place-items:center;
   box-shadow:inset 0 0 0 1px var(--line);transition:.15s;flex:none;
 }
 .copy-btn:hover{background:rgba(245,166,35,.18);color:var(--amber-soft)}
@@ -258,7 +289,7 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
 .hist h3 .clr:hover{color:var(--bad)}
 .hist-list{display:flex;flex-direction:column;gap:6px}
 .hi{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:9px 11px;border-radius:11px;
-  background:rgba(255,255,255,.04);border:1px solid var(--line);cursor:pointer;transition:.15s}
+  background:var(--field);border:1px solid var(--line);cursor:pointer;transition:.15s}
 .hi:hover{background:rgba(245,166,35,.09)}
 .hi .n{font-size:12.5px;grid-column:1;grid-row:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hi .c{font-size:12px;font-family:'JetBrains Mono';color:var(--amber-soft);grid-column:1;grid-row:2}
@@ -267,25 +298,27 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
 .hi .x:hover{color:var(--bad)}
 .empty{font-size:12px;color:var(--ink-faint);padding:8px 2px}
 
-/* map marker pulse + recenter btn */
+/* floating map controls over the full-screen map */
 .recenter{
-  position:absolute;right:14px;bottom:14px;z-index:500;
-  width:44px;height:44px;border-radius:14px;display:grid;place-items:center;cursor:pointer;color:var(--ink);
+  position:fixed;right:clamp(14px,3vw,30px);bottom:calc(18px + env(safe-area-inset-bottom));z-index:25;
+  width:46px;height:46px;border-radius:15px;display:grid;place-items:center;cursor:pointer;color:var(--ink);
+  pointer-events:auto;
 }
 .recenter svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8}
-.maptip{position:absolute;left:14px;top:14px;z-index:500;font-size:11.5px;color:var(--ink-dim);
-  padding:8px 12px;border-radius:12px;pointer-events:none}
+.maptip{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom));
+  z-index:25;font-size:12px;color:var(--ink);
+  padding:9px 14px;border-radius:13px;pointer-events:none}
 
 /* settings popover */
 .settings-pop{
-  position:absolute;top:64px;right:clamp(14px,3vw,30px);z-index:30;width:280px;padding:18px;
+  position:absolute;top:64px;right:clamp(14px,3vw,30px);z-index:30;width:300px;padding:18px;
   display:none;
 }
 .settings-pop.open{display:block}
 .settings-pop h4{margin:0 0 4px;font-size:13px;font-weight:700}
-.set-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
+.set-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap}
 .set-row .lbl{font-size:12.5px;color:var(--ink-dim)}
-.toggle{width:46px;height:27px;border-radius:99px;background:rgba(255,255,255,.14);
+.toggle{width:46px;height:27px;border-radius:99px;background:var(--field-line);
   position:relative;cursor:pointer;transition:.2s;flex:none}
 .toggle.on{background:var(--amber)}
 .toggle .dot{position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;
@@ -294,12 +327,17 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
 .set-row input[type=range]{width:120px;accent-color:var(--amber)}
 .set-note{font-size:11px;color:var(--ink-faint);margin-top:3px;line-height:1.5}
 
-/* Leaflet dark tweaks */
-.leaflet-container{background:#15140f}
-.leaflet-control-zoom a{background:rgba(40,37,30,.85)!important;color:#f3efe6!important;
-  border-color:rgba(255,255,255,.1)!important;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.leaflet-control-attribution{background:rgba(21,20,15,.6)!important;color:#8a8273!important}
-.leaflet-control-attribution a{color:#c0b8a8!important}
+/* Leaflet controls — theme-aware via tokens */
+.leaflet-container{background:var(--bg-0)}
+.leaflet-control-zoom{border:none!important;box-shadow:0 8px 22px -12px rgba(0,0,0,.5)!important;
+  border-radius:13px!important;overflow:hidden}
+.leaflet-control-zoom a{background:rgba(var(--glass-rgb),.78)!important;color:var(--ink)!important;
+  border-color:var(--line)!important;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  width:34px!important;height:34px!important;line-height:34px!important;font-size:18px!important}
+.leaflet-control-zoom a:hover{background:rgba(var(--glass-rgb),.92)!important}
+.leaflet-control-attribution{background:rgba(var(--glass-rgb),.55)!important;color:var(--ink-faint)!important;
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.leaflet-control-attribution a{color:var(--ink-dim)!important}
 .mc-marker{filter:drop-shadow(0 0 10px rgba(245,166,35,.8))}
 
 /* ====== Footer / disclaimer ====== */
@@ -313,22 +351,20 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
 
 /* ====== Responsive ====== */
 @media (max-width:880px){
-  html,body{height:auto;overflow:visible}
-  #bgmap,#bg-veil{position:fixed}
-  #app{height:auto;min-height:100vh}
+  /* map stays a fixed full-screen background; the whole app overlay scrolls
+     over it. Panels capture touch; the bottom padding leaves a pannable strip. */
+  #app{height:100dvh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
   main{
-    display:flex;flex-direction:column;gap:16px;
-    overflow:visible;height:auto;
+    display:block;height:auto;overflow:visible;
+    padding-bottom:34vh; /* pannable map strip below the content */
   }
-  .left{overflow:visible;max-height:none;padding-right:0}
-  .right{min-height:0;height:62vh;flex:none}
-  #map{position:absolute;inset:0}
+  .left{width:100%;max-width:100%;overflow:visible;max-height:none;padding-right:0}
   .settings-pop{left:14px;right:14px;width:auto;top:60px;position:fixed}
+  .site-footer{pointer-events:auto}
 }
 @media (max-width:480px){
   .brand h1 .jp{display:none}
   .tab{font-size:11.5px;padding:9px 2px}
-  .topbar{position:sticky;top:0;z-index:20}
 }
 @media (prefers-reduced-motion:reduce){
   .glass::after,*{animation:none!important;transition:none!important}
@@ -374,7 +410,7 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
   </filter>
 </svg>
 
-<div id="bgmap"></div>
+<div id="map"></div>
 <div id="bg-veil"></div>
 
 <div id="app">
@@ -391,7 +427,25 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
 
   <!-- settings popover -->
   <div class="settings-pop glass refract-target" id="settings-pop">
-    <h4>玻璃外觀</h4>
+    <h4>外觀設定</h4>
+    <div class="set-row">
+      <div class="lbl">明暗主題</div>
+      <div class="seg" id="theme-seg">
+        <button data-theme="auto" class="on">自動</button>
+        <button data-theme="dark">深色</button>
+        <button data-theme="light">淺色</button>
+      </div>
+    </div>
+    <div class="set-row">
+      <div class="lbl">地圖樣式</div>
+      <div class="seg" id="mapstyle-seg">
+        <button data-mapstyle="auto" class="on">自動</button>
+        <button data-mapstyle="dark">深色</button>
+        <button data-mapstyle="light">淺色</button>
+        <button data-mapstyle="google">Google</button>
+      </div>
+    </div>
+    <div class="set-divider"></div>
     <div class="set-row">
       <div><div class="lbl">清晰可讀模式</div><div class="set-note">關閉邊緣折射、加重模糊，文字更好讀</div></div>
       <div class="toggle" id="tg-soft" role="switch" tabindex="0"><div class="dot"></div></div>
@@ -483,20 +537,17 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
         <div class="hist-list" id="hist-list"></div>
       </div>
     </section>
-
-    <!-- RIGHT map -->
-    <section class="right">
-      <div id="map"></div>
-      <div class="maptip glass" id="maptip" style="display:none">點選模式：在地圖上按一下</div>
-      <div class="recenter glass refract-target" id="recenter" title="回到標記" role="button" tabindex="0">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-      </div>
-    </section>
   </main>
   <footer class="site-footer">
     <p>本工具與 DENSO 公司無任何關聯。「マップコード（MAPCODE）」為株式会社 DENSO 之註冊商標，本站僅產生相容格式之地點代碼，供參考用途，計算結果可能與官方數值有誤差，請勿作為唯一依據。</p>
     <p>地圖與地名資料 © OpenStreetMap 貢獻者（ODbL）· 圖磚 © CARTO · 地名搜尋由 Nominatim 提供。</p>
   </footer>
+
+  <!-- floating map controls (overlay the full-screen map) -->
+  <div class="maptip glass" id="maptip" style="display:none">點選模式：在地圖上按一下</div>
+  <div class="recenter glass refract-target" id="recenter" title="回到標記" role="button" tabindex="0">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+  </div>
 </div>
 
 <script src="zonecoords.js"></script>
@@ -567,27 +618,63 @@ const Zone = {
   }
 };
 
-/* ===================== Maps ===================== */
-const TILE='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+/* ===================== Map ===================== */
+const TILES={
+  dark:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  light:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  google:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+};
 const ATTR='&copy; OpenStreetMap &copy; CARTO';
-const bg=L.map('bgmap',{zoomControl:false,attributionControl:false,dragging:false,
-  scrollWheelZoom:false,doubleClickZoom:false,keyboard:false,touchZoom:false})
-  .setView([36.2,138.2],6);
-L.tileLayer(TILE,{maxZoom:19,subdomains:'abcd'}).addTo(bg);
 
-const map=L.map('map',{zoomControl:true,attributionControl:true}).setView([35.6586,139.7454],16);
-L.tileLayer(TILE,{maxZoom:19,subdomains:'abcd',attribution:ATTR}).addTo(map);
+const map=L.map('map',{zoomControl:false,attributionControl:true})
+  .setView([35.6586,139.7454],16);
+L.control.zoom({position:'bottomleft'}).addTo(map);
+let tileLayer=L.tileLayer(TILES.dark,{maxZoom:19,subdomains:'abcd',attribution:ATTR}).addTo(map);
+
+function setTiles(key){
+  if(!TILES[key]) key='dark';
+  tileLayer.setUrl(TILES[key]);
+}
 
 const mcIcon=L.divIcon({className:'mc-marker',
   html:'<svg width="34" height="44" viewBox="0 0 34 44"><path d="M17 0C7.6 0 0 7.5 0 16.8 0 29 17 44 17 44s17-15 17-27.2C34 7.5 26.4 0 17 0z" fill="#f5a623"/><circle cx="17" cy="17" r="6.5" fill="#241400"/></svg>',
   iconSize:[34,44],iconAnchor:[17,44]});
 let marker=null, lastLatLng=null;
+
+/* Compute the map center so that the marker lands in the VISIBLE area,
+   clear of the floating panels (left column on desktop, top stack on mobile). */
+function visibleCenter(lat,lng,zoom){
+  const size=map.getSize();           // {x,y} px
+  const isMobile=window.matchMedia('(max-width:880px)').matches;
+  // desired on-screen point for the marker (px from top-left)
+  let targetX, targetY;
+  if(isMobile){
+    // panels occupy the top; put marker in the lower pannable strip
+    targetX=size.x*0.5;
+    targetY=size.y*0.78;
+  }else{
+    // left panel ~380px + margins; center the marker in the right space
+    const panelRight=Math.min(430, size.x*0.5);
+    targetX=panelRight+(size.x-panelRight)*0.5;
+    targetY=size.y*0.5;
+  }
+  const z=zoom!=null?zoom:map.getZoom();
+  const targetPt=map.project([lat,lng],z);
+  // center point = target - (desiredScreenPoint - screenCenter)
+  const centerPt=targetPt.subtract(
+    L.point(targetX,targetY).subtract(L.point(size.x/2,size.y/2))
+  );
+  return map.unproject(centerPt,z);
+}
+
 function setMarker(lat,lng,fly=true){
   if(marker) marker.setLatLng([lat,lng]);
   else marker=L.marker([lat,lng],{icon:mcIcon}).addTo(map);
   lastLatLng=[lat,lng];
-  if(fly) map.flyTo([lat,lng],Math.max(map.getZoom(),16),{duration:.6});
-  bg.flyTo([lat,lng],8,{duration:.8});
+  if(fly){
+    const z=Math.max(map.getZoom(),16);
+    map.flyTo(visibleCenter(lat,lng,z),z,{duration:.6});
+  }
 }
 
 /* ===================== State / UI ===================== */
@@ -748,12 +835,50 @@ $('#clr-hist').onclick=()=>{hist=[];saveHist();renderHist();};
 renderHist();
 
 /* ---- recenter ---- */
-$('#recenter').onclick=()=>{ if(lastLatLng) map.flyTo(lastLatLng,16,{duration:.6}); };
+$('#recenter').onclick=()=>{ if(lastLatLng){ const z=Math.max(map.getZoom(),16);
+  map.flyTo(visibleCenter(lastLatLng[0],lastLatLng[1],z),z,{duration:.6}); } };
 
 /* ===================== Settings ===================== */
 const sb=$('#settings-btn'), sp=$('#settings-pop');
 sb.onclick=()=>sp.classList.toggle('open');
 document.addEventListener('click',e=>{ if(!sp.contains(e.target)&&!sb.contains(e.target)) sp.classList.remove('open'); });
+
+/* ---- theme (UI light/dark) + map style, both with "auto" = follow system ---- */
+const mq=window.matchMedia('(prefers-color-scheme: light)');
+let themePref=localStorage.getItem('jmc-theme')||'auto';        // auto|dark|light
+let mapPref=localStorage.getItem('jmc-mapstyle')||'auto';       // auto|dark|light|google
+
+function systemIsLight(){ return mq.matches; }
+function effectiveTheme(){ return themePref==='auto' ? (systemIsLight()?'light':'dark') : themePref; }
+function effectiveMap(){
+  if(mapPref!=='auto') return mapPref;
+  return systemIsLight() ? 'light' : 'dark';   // auto map follows system light/dark
+}
+function applyAppearance(){
+  const t=effectiveTheme();
+  document.body.classList.toggle('light', t==='light');
+  setTiles(effectiveMap());
+}
+function markSeg(id,attr,val){
+  document.querySelectorAll('#'+id+' button').forEach(b=>
+    b.classList.toggle('on', b.getAttribute(attr)===val));
+}
+markSeg('theme-seg','data-theme',themePref);
+markSeg('mapstyle-seg','data-mapstyle',mapPref);
+applyAppearance();
+
+$('#theme-seg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  themePref=b.getAttribute('data-theme'); localStorage.setItem('jmc-theme',themePref);
+  markSeg('theme-seg','data-theme',themePref); applyAppearance();
+});
+$('#mapstyle-seg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  mapPref=b.getAttribute('data-mapstyle'); localStorage.setItem('jmc-mapstyle',mapPref);
+  markSeg('mapstyle-seg','data-mapstyle',mapPref); applyAppearance();
+});
+// react to OS theme changes when on "auto"
+mq.addEventListener('change',()=>{ if(themePref==='auto'||mapPref==='auto') applyAppearance(); });
 
 /* clarity (soft) toggle */
 const tgSoft=$('#tg-soft');
@@ -769,7 +894,11 @@ const savedLens=localStorage.getItem('jmc-lens')||'28';
 $('#rg-lens').value=savedLens; setLens(savedLens);
 $('#rg-lens').oninput=e=>setLens(e.target.value);
 
-$('#rg-alpha').oninput=e=>document.documentElement.style.setProperty('--glass-a',(e.target.value/100).toFixed(2));
+const savedAlpha=localStorage.getItem('jmc-alpha');
+if(savedAlpha){ $('#rg-alpha').value=savedAlpha;
+  document.documentElement.style.setProperty('--glass-a',(savedAlpha/100).toFixed(2)); }
+$('#rg-alpha').oninput=e=>{document.documentElement.style.setProperty('--glass-a',(e.target.value/100).toFixed(2));
+  localStorage.setItem('jmc-alpha',e.target.value);};
 
 /* ===================== Motion-reactive specular highlights =====================
    On a phone, tilt drives the glint + specular rim angle (gyroscope).
@@ -811,7 +940,7 @@ function maybeRequestMotion(){
 window.addEventListener('touchstart',maybeRequestMotion,{once:true,passive:true});
 
 /* keep Leaflet sized correctly across layout / orientation changes */
-function fixMapSize(){ map.invalidateSize(); bg.invalidateSize(); }
+function fixMapSize(){ map.invalidateSize(); }
 window.addEventListener('resize', fixMapSize);
 window.addEventListener('orientationchange', ()=>setTimeout(fixMapSize,250));
 
