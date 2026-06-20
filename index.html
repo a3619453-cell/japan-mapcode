@@ -2,7 +2,7 @@
 <html lang="zh-Hant-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>日本地點代碼查詢</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -352,16 +352,29 @@ body.light .code-big{color:#1c2530;text-shadow:none}
 
 /* ====== Responsive ====== */
 @media (max-width:880px){
-  /* map stays a fixed full-screen background; the whole app overlay scrolls
-     over it. Panels capture touch; the bottom padding leaves a pannable strip. */
-  #app{height:100dvh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+  /* Map is a fixed block pinned to the BOTTOM of the screen.
+     Panels occupy the top portion and scroll independently above it,
+     so cards never cover the map. */
+  :root{--map-h:44vh}
+  #map{top:auto;bottom:0;left:0;right:0;height:var(--map-h);z-index:0}
+  #bg-veil{top:auto;bottom:0;height:var(--map-h)}   /* tint only the map area */
+  #app{
+    position:fixed;top:0;left:0;right:0;bottom:var(--map-h);
+    height:auto;display:flex;flex-direction:column;
+    pointer-events:none;
+  }
   main{
-    display:block;height:auto;overflow:visible;
-    padding-bottom:34vh; /* pannable map strip below the content */
+    flex:1;min-height:0;display:block;
+    overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+    padding-bottom:14px;
+    pointer-events:auto;            /* panel area scrolls */
   }
   .left{width:100%;max-width:100%;overflow:visible;max-height:none;padding-right:0}
   .settings-pop{left:14px;right:14px;width:auto;top:60px;position:fixed}
   .site-footer{pointer-events:auto}
+  /* keep the map controls inside the bottom map block */
+  .recenter{bottom:calc(12px + env(safe-area-inset-bottom))}
+  .maptip{bottom:calc(12px + env(safe-area-inset-bottom))}
 }
 @media (max-width:480px){
   .brand h1 .jp{display:none}
@@ -642,26 +655,21 @@ const mcIcon=L.divIcon({className:'mc-marker',
   iconSize:[34,44],iconAnchor:[17,44]});
 let marker=null, lastLatLng=null;
 
-/* Compute the map center so that the marker lands in the VISIBLE area,
-   clear of the floating panels (left column on desktop, top stack on mobile). */
+/* Compute the map center so the marker lands in the visible area.
+   Desktop: the map is full-screen with a floating left panel, so offset the
+   marker to the right of that panel. Mobile: the map is its own block at the
+   bottom (no overlay), so just center the marker in it. */
 function visibleCenter(lat,lng,zoom){
-  const size=map.getSize();           // {x,y} px
+  const size=map.getSize();
   const isMobile=window.matchMedia('(max-width:880px)').matches;
-  // desired on-screen point for the marker (px from top-left)
-  let targetX, targetY;
-  if(isMobile){
-    // panels occupy the top; put marker in the lower pannable strip
-    targetX=size.x*0.5;
-    targetY=size.y*0.78;
-  }else{
-    // left panel ~380px + margins; center the marker in the right space
-    const panelRight=Math.min(430, size.x*0.5);
-    targetX=panelRight+(size.x-panelRight)*0.5;
-    targetY=size.y*0.5;
-  }
   const z=zoom!=null?zoom:map.getZoom();
+  if(isMobile){
+    return L.latLng(lat,lng);   // map block is unobstructed; center normally
+  }
+  const panelRight=Math.min(430, size.x*0.5);
+  const targetX=panelRight+(size.x-panelRight)*0.5;
+  const targetY=size.y*0.5;
   const targetPt=map.project([lat,lng],z);
-  // center point = target - (desiredScreenPoint - screenCenter)
   const centerPt=targetPt.subtract(
     L.point(targetX,targetY).subtract(L.point(size.x/2,size.y/2))
   );
@@ -724,18 +732,14 @@ function showResult(lat,lng,placeName){
   revealResult();
 }
 
-/* On mobile the panels scroll over the map; after a lookup, bring the result
-   card near the top so the code is visible AND the map with the marker shows
-   below it — otherwise the user is left staring at the search box. */
+/* On mobile the panel area scrolls above a fixed bottom map. After a lookup,
+   bring the result card into view within that scroll area. The map (with the
+   marker) is always visible in the bottom block, so we only surface the code. */
 function revealResult(){
   if(!window.matchMedia('(max-width:880px)').matches) return;
   requestAnimationFrame(()=>{
-    const app=document.getElementById('app');
     const card=document.getElementById('result-card');
-    if(!app||!card) return;
-    // position of the card relative to the current scroll, minus a top-bar gap
-    const delta=card.getBoundingClientRect().top - 86;
-    app.scrollTo({top:app.scrollTop+delta,behavior:'smooth'});
+    if(card) card.scrollIntoView({behavior:'smooth',block:'nearest'});
   });
 }
 
@@ -972,6 +976,27 @@ window.addEventListener('touchstart',maybeRequestMotion,{once:true,passive:true}
 function fixMapSize(){ map.invalidateSize(); }
 window.addEventListener('resize', fixMapSize);
 window.addEventListener('orientationchange', ()=>setTimeout(fixMapSize,250));
+
+/* Lock PAGE zoom (pinch / double-tap) everywhere except the map, since iOS
+   Safari can ignore user-scalable=no. The map keeps its own zoom. */
+(function(){
+  const inMap=t=>t&&t.closest&&t.closest('#map');
+  // Safari pinch gestures
+  document.addEventListener('gesturestart',e=>{ if(!inMap(e.target)) e.preventDefault(); },{passive:false});
+  document.addEventListener('gesturechange',e=>{ if(!inMap(e.target)) e.preventDefault(); },{passive:false});
+  // double-tap to zoom
+  let lastTouch=0;
+  document.addEventListener('touchend',e=>{
+    if(inMap(e.target)) return;
+    const now=Date.now();
+    if(now-lastTouch<=300) e.preventDefault();
+    lastTouch=now;
+  },{passive:false});
+  // pinch via multi-touch move outside the map
+  document.addEventListener('touchmove',e=>{
+    if(e.touches.length>1 && !inMap(e.target)) e.preventDefault();
+  },{passive:false});
+})();
 
 /* init demo marker */
 setTimeout(()=>{ showResult(35.6586,139.7454,'東京タワー（範例）'); fixMapSize(); },300);
