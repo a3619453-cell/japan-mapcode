@@ -252,6 +252,7 @@ input:focus{border-color:var(--ring);box-shadow:0 0 0 3px rgba(245,166,35,.15);
   transition:.15s;
 }
 .res:hover{background:rgba(245,166,35,.10);border-color:rgba(245,166,35,.3)}
+.res.picked{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.45)}
 .res .nm{font-size:13.5px;font-weight:500;line-height:1.35}
 .res .ad{font-size:11px;color:var(--ink-faint);margin-top:2px;line-height:1.35}
 .res .gmap{margin-inline-start:auto;align-self:center;color:var(--ink-faint);
@@ -712,6 +713,7 @@ function showResult(lat,lng,placeName){
   if(code==='NOT_IN_JAPAN'){
     $('#r-code').textContent='—';
     st.textContent='此座標不在代碼涵蓋範圍內。'; st.className='status err';
+    revealResult();
     return;
   }
   if(code===null){ st.textContent='資料載入中…'; st.className='status'; return; }
@@ -719,6 +721,22 @@ function showResult(lat,lng,placeName){
   st.textContent='已算出代碼'; st.className='status ok';
   setMarker(lat,lng);
   addHistory(placeName||('('+lat.toFixed(4)+', '+lng.toFixed(4)+')'),code,lat,lng);
+  revealResult();
+}
+
+/* On mobile the panels scroll over the map; after a lookup, bring the result
+   card near the top so the code is visible AND the map with the marker shows
+   below it — otherwise the user is left staring at the search box. */
+function revealResult(){
+  if(!window.matchMedia('(max-width:880px)').matches) return;
+  requestAnimationFrame(()=>{
+    const app=document.getElementById('app');
+    const card=document.getElementById('result-card');
+    if(!app||!card) return;
+    // position of the card relative to the current scroll, minus a top-bar gap
+    const delta=card.getBoundingClientRect().top - 86;
+    app.scrollTo({top:app.scrollTop+delta,behavior:'smooth'});
+  });
 }
 
 /* copy */
@@ -804,7 +822,18 @@ function doSearch(){
           '<span class="gmap" title="在 Google 地圖開啟">G ↗</span>';
         div.querySelector('.gmap').onclick=ev=>{ev.stopPropagation();
           window.open(gmapLink(lat,lng,nm),'_blank');};
-        div.onclick=()=>showResult(lat,lng,nm);
+        div.onclick=()=>{
+          // collapse the list to just this pick so the panel shrinks and the
+          // result/code + map come into view (important on mobile)
+          box.innerHTML='';
+          const picked=div.cloneNode(true);
+          picked.classList.add('picked');
+          picked.querySelector('.gmap').onclick=ev=>{ev.stopPropagation();
+            window.open(gmapLink(lat,lng,nm),'_blank');};
+          picked.onclick=()=>showResult(lat,lng,nm);
+          box.appendChild(picked);
+          showResult(lat,lng,nm);
+        };
         box.appendChild(div);
       });
     })
