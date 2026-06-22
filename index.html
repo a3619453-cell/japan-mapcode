@@ -192,10 +192,14 @@ main{
 .left{
   display:flex;flex-direction:column;gap:16px;min-height:0;
   width:408px;max-width:calc(100vw - 28px);
-  max-height:100%;overflow:auto;
+  max-height:100%;overflow:auto;-webkit-overflow-scrolling:touch;
+  pointer-events:auto;            /* capture scroll gestures so the map doesn't steal them */
   /* inner padding gives the card drop-shadows room so the scroll box never clips them */
   padding:8px 16px 28px;
 }
+/* keep cards at their natural height — flex-shrink would squash them and the
+   per-card overflow:hidden would then clip the content (and kill scrolling) */
+.left>*{flex-shrink:0}
 .left::-webkit-scrollbar{width:0}
 
 /* ====== Input tabs ====== */
