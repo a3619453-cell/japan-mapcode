@@ -317,6 +317,8 @@ body.light .code-big{color:#1c2530;text-shadow:none}
   padding:9px 14px;border-radius:13px;pointer-events:none}
 /* mobile-only "show map" toggle (hidden on desktop) */
 .map-toggle{display:none}
+/* mobile-only soft-fade blur haze under the title bar (hidden on desktop) */
+.scroll-haze{display:none}
 
 /* settings popover */
 .settings-pop{
@@ -389,6 +391,24 @@ body.light .code-big{color:#1c2530;text-shadow:none}
   body.map-focus .left .panel,
   body.map-focus .left .site-footer{display:none}
   body.map-focus .left{padding-bottom:14px}   /* shrink the dead zone below the lone card */
+
+  /* soft top edge: once the panel is scrolled, cards fade out near the title bar
+     instead of being hard-clipped (only when scrolled, so the resting first card
+     stays fully crisp) */
+  body.panel-scrolled .left{
+    -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 50px);
+    mask-image:linear-gradient(to bottom, transparent 0, #000 50px);
+  }
+  /* thin blur haze pinned just below the title bar; fades in while scrolling so
+     cards passing under it blur slightly before they fade away */
+  .scroll-haze{
+    display:block;position:fixed;left:0;right:0;top:var(--topbar-h,70px);
+    height:46px;z-index:6;pointer-events:none;opacity:0;transition:opacity .22s ease;
+    -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+    -webkit-mask-image:linear-gradient(to bottom, #000 0, #000 30%, transparent 100%);
+    mask-image:linear-gradient(to bottom, #000 0, #000 30%, transparent 100%);
+  }
+  body.panel-scrolled .scroll-haze{opacity:1}
 }
 @media (max-width:480px){
   .brand h1 .jp{display:none}
@@ -585,6 +605,9 @@ body.light .code-big{color:#1c2530;text-shadow:none}
     <svg class="ic ic-panel" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="13" y2="18"/></svg>
     <span class="lbl">顯示地圖</span>
   </button>
+
+  <!-- mobile: soft blur haze just below the title bar so cards fade+blur as they scroll up -->
+  <div class="scroll-haze" aria-hidden="true"></div>
 </div>
 
 <script src="zonecoords.js"></script>
@@ -918,6 +941,18 @@ function placeFooter(){
 }
 mq880b.addEventListener('change',placeFooter);
 placeFooter();
+
+/* ---- mobile: fade + slight blur as cards scroll up under the title bar ---- */
+function setTopbarH(){
+  document.documentElement.style.setProperty('--topbar-h',
+    document.querySelector('.topbar').offsetHeight+'px');
+}
+setTopbarH();
+window.addEventListener('resize',setTopbarH);
+window.addEventListener('orientationchange',()=>setTimeout(setTopbarH,250));
+leftEl.addEventListener('scroll',()=>{
+  document.body.classList.toggle('panel-scrolled', leftEl.scrollTop>4);
+},{passive:true});
 
 /* ===================== Settings ===================== */
 const sb=$('#settings-btn'), sp=$('#settings-pop');
