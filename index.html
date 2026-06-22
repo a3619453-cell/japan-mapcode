@@ -366,7 +366,8 @@ body.light .code-big{color:#1c2530;text-shadow:none}
      focused into that open lower area (see visibleCenter), never behind the panel. */
   .left{
     width:100%;max-width:100%;
-    max-height:58vh;                 /* cap the panel so the lower screen stays open map (padding from base) */
+    max-height:100%;                 /* panel fills the whole screen (the toggle button switches to map) */
+    padding-bottom:88px;             /* clear the floating "show map" button at the bottom */
   }
   .settings-pop{left:14px;right:14px;width:auto;top:60px;position:fixed}
   .recenter{bottom:calc(18px + env(safe-area-inset-bottom))}
@@ -384,8 +385,10 @@ body.light .code-big{color:#1c2530;text-shadow:none}
   .map-toggle .ic-panel{display:none}
   body.map-focus .map-toggle .ic-map{display:none}
   body.map-focus .map-toggle .ic-panel{display:inline-block}
-  /* map-focus: collapse search + history, keep only the address/code result card */
-  body.map-focus .left .panel{display:none}
+  /* map-focus: collapse search + history + footer, keep only the address/code result card */
+  body.map-focus .left .panel,
+  body.map-focus .left .site-footer{display:none}
+  body.map-focus .left{padding-bottom:14px}   /* shrink the dead zone below the lone card */
 }
 @media (max-width:480px){
   .brand h1 .jp{display:none}
@@ -905,6 +908,16 @@ mapToggle.onclick=()=>{
   mapToggle.setAttribute('aria-pressed', on?'true':'false');
   mapToggleLbl.textContent = on ? '顯示面板' : '顯示地圖';
 };
+
+/* ---- mobile: let the panel use the whole screen by moving the (tall) footer
+   into the scroll flow; on desktop it stays as the bottom bar ---- */
+const footerEl=$('.site-footer'), appEl=$('#app'), leftEl=$('.left'), mq880b=window.matchMedia('(max-width:880px)');
+function placeFooter(){
+  if(mq880b.matches){ if(footerEl.parentElement!==leftEl) leftEl.appendChild(footerEl); }
+  else{ if(footerEl.parentElement!==appEl) appEl.appendChild(footerEl); }
+}
+mq880b.addEventListener('change',placeFooter);
+placeFooter();
 
 /* ===================== Settings ===================== */
 const sb=$('#settings-btn'), sp=$('#settings-pop');
