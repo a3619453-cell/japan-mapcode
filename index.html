@@ -311,6 +311,8 @@ body.light .code-big{color:#1c2530;text-shadow:none}
 .maptip{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom));
   z-index:25;font-size:12px;color:var(--ink);
   padding:9px 14px;border-radius:13px;pointer-events:none}
+/* mobile-only "show map" toggle (hidden on desktop) */
+.map-toggle{display:none}
 
 /* settings popover */
 .settings-pop{
@@ -364,7 +366,22 @@ body.light .code-big{color:#1c2530;text-shadow:none}
   }
   .settings-pop{left:14px;right:14px;width:auto;top:60px;position:fixed}
   .recenter{bottom:calc(18px + env(safe-area-inset-bottom))}
-  .maptip{bottom:calc(18px + env(safe-area-inset-bottom))}
+  .maptip{bottom:calc(64px + env(safe-area-inset-bottom))}   /* sit above the toggle */
+  /* the "show map" toggle pill, centered at the bottom */
+  .map-toggle{
+    position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(18px + env(safe-area-inset-bottom));z-index:26;
+    display:inline-flex;align-items:center;gap:8px;
+    padding:11px 18px;border-radius:16px;cursor:pointer;color:var(--ink);
+    font-family:'Noto Sans TC',sans-serif;font-weight:500;font-size:13.5px;white-space:nowrap;
+  }
+  .map-toggle .ic{width:18px;height:18px;stroke:currentColor;fill:none;
+    stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}
+  .map-toggle .ic-panel{display:none}
+  body.map-focus .map-toggle .ic-map{display:none}
+  body.map-focus .map-toggle .ic-panel{display:inline-block}
+  /* map-focus: collapse search + history, keep only the address/code result card */
+  body.map-focus .left .panel{display:none}
 }
 @media (max-width:480px){
   .brand h1 .jp{display:none}
@@ -554,6 +571,13 @@ body.light .code-big{color:#1c2530;text-shadow:none}
   <div class="recenter glass refract-target" id="recenter" title="回到標記" role="button" tabindex="0">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
   </div>
+
+  <!-- mobile: collapse the panel (keep only address + code) to free the map; tap again to restore -->
+  <button class="map-toggle glass refract-target" id="map-toggle" type="button" aria-pressed="false" title="顯示地圖">
+    <svg class="ic ic-map" viewBox="0 0 24 24" aria-hidden="true"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+    <svg class="ic ic-panel" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="13" y2="18"/></svg>
+    <span class="lbl">顯示地圖</span>
+  </button>
 </div>
 
 <script src="zonecoords.js"></script>
@@ -869,6 +893,14 @@ renderHist();
 /* ---- recenter ---- */
 $('#recenter').onclick=()=>{ if(lastLatLng){ const z=Math.max(map.getZoom(),16);
   map.flyTo(visibleCenter(lastLatLng[0],lastLatLng[1],z),z,{duration:.6}); } };
+
+/* ---- mobile: collapse the panel to free the map (keep only address + code) ---- */
+const mapToggle=$('#map-toggle'), mapToggleLbl=mapToggle.querySelector('.lbl');
+mapToggle.onclick=()=>{
+  const on=document.body.classList.toggle('map-focus');
+  mapToggle.setAttribute('aria-pressed', on?'true':'false');
+  mapToggleLbl.textContent = on ? '顯示面板' : '顯示地圖';
+};
 
 /* ===================== Settings ===================== */
 const sb=$('#settings-btn'), sp=$('#settings-pop');
